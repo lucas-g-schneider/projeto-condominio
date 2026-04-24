@@ -353,7 +353,7 @@ WHERE DATE(a.data_hora_local AT TIME ZONE 'UTC')
 ```
 
 **Como comunicaria ao negócio:**
-> "Nossos dados de acesso misturam relógios de cidades com fusos diferentes. Uma análise de 'quantos acessos tivemos no dia X' sem corrigir os fusos vai colocar ~12% dos registros no dia errado — são acessos que aconteceram depois das 21h no horário local e cruzaram a meia-noite UTC. Para análises de engajamento diário ou alertas de 'acessos de madrugada', precisamos sempre converter para uma referência única antes de contar. Caso contrário, alertas de uso suspeito podem ser simplesmente moradores de Cuiabá usando o app normalmente."
+> "Nossos dados de acesso misturam relógios de cidades com fusos diferentes. Uma análise de 'quantos acessos tivemos no dia X' sem corrigir os fusos vai colocar ~12% dos registros no dia errado, são acessos que aconteceram depois das 21h no horário local e cruzaram a meia-noite UTC. Para análises de engajamento diário ou alertas de 'acessos de madrugada', precisamos sempre converter para uma referência única antes de contar. Caso contrário, alertas de uso suspeito podem ser simplesmente moradores de Cuiabá usando o app normalmente."
 
 ---
 
