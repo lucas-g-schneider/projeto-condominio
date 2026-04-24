@@ -63,13 +63,13 @@ A primeira hipótese natural seria aplicar um threshold global (ex: P95 geral) p
 | `entrega` | 1.277 | 2,0 | 3,5 | 588,8 | 1.989,0 |
 | `visita` | 978 | 1,2 | 2,1 | 521,7 | 1.985,1 |
 
-O dado mais revelador: para `visita` e `entrega`, a mediana é de 1-2h e o P75 é de 2-3,5h — mas o P95 explode para 500+ horas. Isso não é resolução lenta. São **ocorrências zumbi**: o usuário não fechou a ocorrência na plataforma, ela ficou em aberto e foi encerrada automaticamente ou de forma retroativa muito tempo depois. É um problema de comportamento do usuário, não um bug técnico no dado em si.
+O dado mais revelador: para `visita` e `entrega`, a mediana é de 1-2h e o P75 é de 2-3,5h. Mas o P95 explode para 500+ horas. Isso não é resolução lenta. São **ocorrências zumbi**: o usuário não fechou a ocorrência na plataforma, ela ficou em aberto e foi encerrada automaticamente ou de forma retroativa muito tempo depois. É um problema de comportamento do usuário, não um bug técnico no dado em si.
 
 Para `manutenção` e `reclamação`, a distribuição é coerente com um processo real que demora mais: a mediana de 18-34h e P95 de 115-215h fazem sentido operacionalmente.
 
 #### Descoberta adicional: dados com data inválida
 
-Durante o carregamento dos dados, foram identificadas **~96 ocorrências com `data_hora = 9999-99-99`** — um valor sentinel que o sistema de origem usa quando a data é desconhecida. Esses registros foram recebidos com `data_hora = NULL` no banco e precisam de investigação na origem.
+Durante o carregamento dos dados, foram identificadas **~96 ocorrências com `data_hora = 9999-99-99`**, um valor sentinel que o sistema de origem usa quando a data é desconhecida. Esses registros foram recebidos com `data_hora = NULL` no banco e precisam de investigação na origem.
 
 #### Query de diagnóstico com thresholds por tipo
 
@@ -181,13 +181,13 @@ GROUP BY tipo;
 
 #### Recomendação de produto (além do dado)
 
-O maior problema de qualidade aqui não é técnico — é comportamental. Os usuários de `visita` e `entrega` não estão confirmando o encerramento das ocorrências na plataforma. A solução de longo prazo não é filtrar esses dados, é **eliminar a causa**:
+O maior problema de qualidade aqui não é técnico, é comportamental. Os usuários de `visita` e `entrega` não estão confirmando o encerramento das ocorrências na plataforma. A solução de longo prazo não é filtrar esses dados, é **eliminar a causa**:
 
 - Implementar notificação automática para o usuário após 1h sem confirmação em `visita`/`entrega`
 - Para `manutenção`/`reclamação`, notificação após 24h sem atualização
 - Isso melhora o dado E a experiência do morador simultaneamente
 
-A definição precisa dos thresholds (4h, 48h, 72h etc.) deve ser validada com o time de negócio antes de virar regra oficial — o que é saudável para o processo de `manutenção` pode variar muito dependendo do tipo de condomínio e do contrato de SLA com o cliente.
+A definição precisa dos thresholds (4h, 48h, 72h etc.) deve ser validada com o time de negócio antes de virar regra oficial, o que é saudável para o processo de `manutenção` pode variar muito dependendo do tipo de condomínio e do contrato de SLA com o cliente.
 
 ---
 
@@ -195,11 +195,11 @@ A definição precisa dos thresholds (4h, 48h, 72h etc.) deve ser validada com o
 
 #### Análise exploratória: validação de integridade antes de filtrar
 
-Antes de aplicar qualquer filtro, validamos que todos os `id_condominio` presentes em `ocorrencias` existem na tabela `condominios`. Isso confirmou que os ambientes estão consistentes — nenhuma ocorrência órfã — e que podemos fazer o JOIN com segurança.
+Antes de aplicar qualquer filtro, validamos que todos os `id_condominio` presentes em `ocorrencias` existem na tabela `condominios`. Isso confirmou que os ambientes estão consistentes, nenhuma ocorrência órfã, e que podemos fazer o JOIN com segurança.
 
 #### Sobre a ordenação pedida
 
-A questão pede para "ordenar do maior para o menor tempo" sem especificar o que exatamente está sendo ordenado. A leitura mais natural — e a que faz sentido para o Customer Success — é **tempo médio de resolução por tipo de ocorrência**, ordenado de forma decrescente. Essa é a informação acionável: quais tipos demandam mais do time de suporte.
+A questão pede para "ordenar do maior para o menor tempo" sem especificar o que exatamente está sendo ordenado. A leitura mais natural, e a que faz sentido para o Customer Success, é **tempo médio de resolução por tipo de ocorrência**, ordenado de forma decrescente. Essa é a informação acionável: quais tipos demandam mais do time de suporte.
 
 #### Sobre o P95: global ou por tipo?
 
@@ -208,7 +208,7 @@ A questão diz "exclua outliers acima do percentil 95". Uma leitura literal apli
 A escolha foi calcular o **P95 por tipo**, que preserva o contexto de cada processo. Em uma conversa real com o solicitante, essa seria uma das perguntas a devolver antes de executar.
 
 ```sql
--- Q2: Tempo médio de resolução — condomínios premium ativos, outliers removidos por P95/tipo
+-- Q2: Tempo médio de resolução, condomínios premium ativos, outliers removidos por P95/tipo
 -- Resultado: apenas tipo e horas médias, ordenado do maior para o menor
 
 WITH
@@ -266,7 +266,7 @@ ORDER BY "Tempo Médio (h)" DESC;
 | entrega | 2,1 |
 | visita | 1,4 |
 
-O padrão reforça o que a Q1 mostrou: `reclamacao` e `manutencao` são processos intrinsecamente mais longos. Vale notar que a **média** (usada aqui) é bem superior à **mediana** de cada tipo (34h e 18h respectivamente) — sinal de que ainda existem casos longos puxando a média para cima mesmo após o corte do P95. Isso reforça a importância de usar mediana como métrica complementar em análises de SLA.
+O padrão reforça o que a Q1 mostrou: `reclamacao` e `manutencao` são processos intrinsecamente mais longos. Vale notar que a **média** (usada aqui) é bem superior à **mediana** de cada tipo (34h e 18h respectivamente), sinal de que ainda existem casos longos puxando a média para cima mesmo após o corte do P95. Isso reforça a importância de usar mediana como métrica complementar em análises de SLA.
 
 ---
 
@@ -280,7 +280,7 @@ O campo `data_hora_local` em `acessos` está no formato ISO 8601 com offset de f
 
 Para entender o impacto real do fuso, rodamos duas contagens de acessos por hora:
 
-**Sem timezone:** extrai a hora local de cada acesso como ela aparece originalmente no timestamp — `18:32` de um registro GMT-3 vira hora 18, `17:52` de um GMT-4 vira hora 17. Tratamos todos como se estivessem no mesmo relógio, ignorando que há 1 hora de diferença entre eles.
+**Sem timezone:** extrai a hora local de cada acesso como ela aparece originalmente no timestamp, `18:32` de um registro GMT-3 vira hora 18, `17:52` de um GMT-4 vira hora 17. Tratamos todos como se estivessem no mesmo relógio, ignorando que há 1 hora de diferença entre eles.
 
 **Com timezone (UTC):** converte todos os timestamps para UTC antes de extrair a hora. `18:32-03:00` vira `21:32 UTC`. `23:03-03:00` vira `02:03 UTC do dia seguinte`.
 
@@ -296,7 +296,7 @@ Isso significa que uma análise de "acessos por dia" sem correção de fuso colo
 
 #### Por que UTC como referência?
 
-UTC é o "relógio zero" universal — sem offset, sem horário de verão, nunca muda. É o padrão da indústria porque bancos de dados (PostgreSQL, Firebase), APIs e serviços de nuvem armazenam timestamps internamente em UTC. Normalizar para UTC garante que comparações entre fusos sejam sempre consistentes e auditáveis.
+UTC é o "relógio zero" universal, sem offset, sem horário de verão, nunca muda. É o padrão da indústria porque bancos de dados (PostgreSQL, Firebase), APIs e serviços de nuvem armazenam timestamps internamente em UTC. Normalizar para UTC garante que comparações entre fusos sejam sempre consistentes e auditáveis.
 
 #### Queries
 
@@ -361,7 +361,7 @@ WHERE DATE(a.data_hora_local AT TIME ZONE 'UTC')
 
 #### Limitação metodológica central
 
-O dataset não possui `data_churn`. Isso impossibilita uma análise de cohort longitudinal verdadeira — que exigiria saber *quando* cada condomínio churnou para calcular taxas por período. Desenvolvemos duas abordagens complementares para contornar essa limitação.
+O dataset não possui `data_churn`. Isso impossibilita uma análise de cohort longitudinal verdadeira, que exigiria saber *quando* cada condomínio churnou para calcular taxas por período. Desenvolvemos duas abordagens complementares para contornar essa limitação.
 
 ---
 
@@ -370,8 +370,8 @@ O dataset não possui `data_churn`. Isso impossibilita uma análise de cohort lo
 Agrupamos os 200 condomínios por mês de ativação e verificamos, na foto do estado atual, quantos estão em `churn`. Isso responde: *"de todos os condomínios que ativaram em julho/2023, qual percentual foi embora?"*
 
 ```sql
--- Q4a: Snapshot cohort — foto do status atual por mês de ativação
--- Sem data_churn, não sabemos quando o churn aconteceu — apenas que aconteceu.
+-- Q4a: Snapshot cohort, foto do status atual por mês de ativação
+-- Sem data_churn, não sabemos quando o churn aconteceu, apenas que aconteceu.
 
 WITH
     cohort_base AS (
@@ -411,9 +411,9 @@ ORDER BY "Cohort";
 | ... | ... | ... | ... | ... | ... |
 | 2024-06 | 19 | 4 | 12 | 3 | 21,1% |
 
-**Interpretação:** O cohort de julho/2023 tem a maior taxa de churn (50%) — os clientes pioneiros tiveram a experiência de um produto mais imaturo. Os cohorts subsequentes estabilizam em torno de 21-31%, sugerindo que o produto melhorou. A taxa geral: **50 churns em 200 condomínios = 25%**.
+**Interpretação:** O cohort de julho/2023 tem a maior taxa de churn (50%), os clientes pioneiros tiveram a experiência de um produto mais imaturo. Os cohorts subsequentes estabilizam em torno de 21-31%, sugerindo que o produto melhorou. A taxa geral: **50 churns em 200 condomínios = 25%**.
 
-**Limitação:** Para cohorts recentes, o churn pode ainda não ter acontecido. A taxa tende a crescer com o tempo — comparar o cohort de 2024-06 (10 meses de vida) com o de 2023-07 (21 meses) subestima o churn dos mais novos.
+**Limitação:** Para cohorts recentes, o churn pode ainda não ter acontecido. A taxa tende a crescer com o tempo, comparar o cohort de 2024-06 (10 meses de vida) com o de 2023-07 (21 meses) subestima o churn dos mais novos.
 
 ---
 
@@ -422,9 +422,9 @@ ORDER BY "Cohort";
 Sem `data_churn`, construímos uma hipótese controlada: o **último acesso registrado de cada condomínio churnado** é tratado como a data aproximada em que ele parou de usar a plataforma. Isso permite perguntar: *"em qual mês de vida da conta o engajamento morreu?"*
 
 ```sql
--- Q4b: Proxy churn — usa o último acesso como aproximação de quando o engajamento cessou
+-- Q4b: Proxy churn, usa o último acesso como aproximação de quando o engajamento cessou
 -- Útil para mapear em qual momento da jornada o cliente abandona a plataforma.
--- IMPORTANTE: validar com negócio antes de usar em decisões — pode haver lag entre
+-- IMPORTANTE: validar com negócio antes de usar em decisões, pode haver lag entre
 -- último acesso e data formal de cancelamento.
 
 WITH
@@ -458,7 +458,7 @@ GROUP BY mes_de_vida
 ORDER BY mes_de_vida;
 ```
 
-**Descoberta central:** todos os 50 churns acontecem **a partir do mês 7** — nenhum condomínio abandona nos primeiros 6 meses. O risco se concentra entre os meses 7 e 18, com pico nos meses 16-17 (7 churns cada = 14% dos churns totais).
+**Descoberta central:** todos os 50 churns acontecem **a partir do mês 7**, nenhum condomínio abandona nos primeiros 6 meses. O risco se concentra entre os meses 7 e 18, com pico nos meses 16-17 (7 churns cada = 14% dos churns totais).
 
 | Mês de Vida | Churns | % do Total | Acumulado |
 |-------------|--------|------------|-----------|
@@ -469,7 +469,7 @@ ORDER BY mes_de_vida;
 | 17 | 7 | 14% | 92% |
 | 18 | 4 | 8% | 100% |
 
-**Interpretação para o negócio:** O período de "lua de mel" dura aproximadamente 6 meses — nenhum churn nos primeiros semestre. O pico de risco ocorre entre 1 e 1,5 anos de conta. Isso sugere que uma ação proativa de CS por volta do mês 5-6 (antes da janela de risco) pode ter alto impacto de retenção.
+**Interpretação para o negócio:** O período de "lua de mel" dura aproximadamente 6 meses, nenhum churn nos primeiros semestre. O pico de risco ocorre entre 1 e 1,5 anos de conta. Isso sugere que uma ação proativa de CS por volta do mês 5-6 (antes da janela de risco) pode ter alto impacto de retenção.
 
 **Recomendação de schema:** adicionar `data_churn` à tabela `condominios` ou criar uma tabela `historico_status_condominio (id_condominio, data_mudanca, status_anterior, status_novo)` para tornar esse proxy desnecessário e habilitar análise de cohort longitudinal verdadeira.
 
@@ -488,14 +488,14 @@ ORDER BY mes_de_vida;
 A arquitetura é organizada em **3 camadas e 5 passos**, com separação clara de responsabilidades:
 
 **Camada 1 — Ingestão**
-- **Fontes:** origem dos dados operacionais — PostgreSQL (condomínios, moradores, ocorrências, acessos). Os dados são copiados fielmente, sem nenhuma transformação. O objetivo é nunca alterar a fonte — apenas trazer uma cópia para dentro do nosso ambiente.
+- **Fontes:** origem dos dados operacionais, PostgreSQL (condomínios, moradores, ocorrências, acessos). Os dados são copiados fielmente, sem nenhuma transformação. O objetivo é nunca alterar a fonte, apenas trazer uma cópia para dentro do nosso ambiente.
 
 **Camada 2 — Transformação**
-- **Staging:** réplica da fonte já no nosso ambiente. Apenas higiene: cast de tipos, padronização de nulos, renomeação de colunas, correção de timezone. Nenhuma regra de negócio aqui. Se a fonte mudar, a staging reflete — e mais nada quebra.
-- **Intermediate:** onde as regras de negócio vivem. Classificação de ocorrências por threshold, cálculo de variação de acessos mês a mês, SCD2 de condomínios. Modelos intermediários são reutilizáveis — uma regra definida aqui vale para todos os marts que a consomem.
-- **Marts:** modelos finais prontos para consumo. Joins já feitos, métricas pré-calculadas, granularidade certa para cada time. O negócio não precisa saber SQL — os dados chegam prontos.
+- **Staging:** réplica da fonte já no nosso ambiente. Apenas higiene: cast de tipos, padronização de nulos, renomeação de colunas, correção de timezone. Nenhuma regra de negócio aqui. Se a fonte mudar, a staging reflete, e mais nada quebra.
+- **Intermediate:** onde as regras de negócio vivem. Classificação de ocorrências por threshold, cálculo de variação de acessos mês a mês, SCD2 de condomínios. Modelos intermediários são reutilizáveis, uma regra definida aqui vale para todos os marts que a consomem.
+- **Marts:** modelos finais prontos para consumo. Joins já feitos, métricas pré-calculadas, granularidade certa para cada time. O negócio não precisa saber SQL, os dados chegam prontos.
 
-> A camada de transformação é a **única fonte de verdade**. O Metabase lê apenas os marts — nunca acessa staging ou intermediate diretamente. O dbt é uma opção natural para orquestrar essa camada, mas não uma obrigatoriedade: o que importa é a disciplina de separação entre camadas, independente da ferramenta.
+> A camada de transformação é a **única fonte de verdade**. O Metabase lê apenas os marts, nunca acessa staging ou intermediate diretamente. O dbt é uma opção natural para orquestrar essa camada, mas não uma obrigatoriedade: o que importa é a disciplina de separação entre camadas, independente da ferramenta.
 
 **Camada 3 — Análise**
 - **Consumo:** Metabase conectado diretamente nos marts. Dashboards por questão, alertas de engajamento e painéis de saúde da carteira para o CS.
@@ -506,7 +506,7 @@ A arquitetura é organizada em **3 camadas e 5 passos**, com separação clara d
 
 ![Padrão de nomenclatura de tabelas e colunas](q5_nomenclatura_tabela_coluna.png)
 
-Convenções definidas para o projeto — consistência importa mais do que perfeição. O que foi decidido aqui vale para todos os modelos:
+Convenções definidas para o projeto, consistência importa mais do que perfeição. O que foi decidido aqui vale para todos os modelos:
 
 **Tabelas / Modelos**
 
@@ -537,7 +537,7 @@ O separador duplo `__` entre sistema e tabela nas primeiras camadas diferencia v
 
 ![Data lineage do modelo de engajamento](q5_lineage_modelagem.png)
 
-Para ilustrar a arquitetura em prática, modelamos um caso concreto: **identificar quais condomínios ativos estão desengajando**, usando dois sinais — queda de acessos mês a mês e redução de moradores ativos.
+Para ilustrar a arquitetura em prática, modelamos um caso concreto: **identificar quais condomínios ativos estão desengajando**, usando dois sinais, queda de acessos mês a mês e redução de moradores ativos.
 
 **Modelos e suas relações:**
 
@@ -562,7 +562,7 @@ postgresql.moradores ────► stg__postgresql__moradores ──► int__m
 ```
 
 **Por que cada intermediate faz uma coisa só?**  
-Se o CS mudar o critério de risco (ex: queda de 20% em vez de 30%), a mudança fica apenas na mart. Se a lógica de agregar acessos mudar, fica apenas no intermediate de acessos. Nada quebra em cascata — cada modelo tem uma única responsabilidade.
+Se o CS mudar o critério de risco (ex: queda de 20% em vez de 30%), a mudança fica apenas na mart. Se a lógica de agregar acessos mudar, fica apenas no intermediate de acessos. Nada quebra em cascata, cada modelo tem uma única responsabilidade.
 
 **Sobre SCD Type 2 em `dim_condominio`:**  
 Quando um condomínio muda de plano (`basic → premium`), o registro anterior recebe `dt_fim_vigencia = hoje - 1` e um novo registro é criado com `dt_inicio_vigencia = hoje`. Isso permite responder: *"qual era o plano do condomínio quando abriu essa ocorrência?"* — essencial para análises de SLA por plano. Para moradores, SCD Type 1 é suficiente: o CS se preocupa com o estado atual, não com o histórico de unidades.
@@ -577,13 +577,13 @@ Quando um condomínio muda de plano (`basic → premium`), o registro anterior r
 
 > **Nota:** Resposta deliberadamente sem jargões técnicos, direcionada a uma pessoa de produto ou negócio.
 
-Um condomínio raramente cancela do nada. Meses antes de ir embora, os moradores já foram parando de usar o aplicativo — menos acessos, menos engajamento, até o silêncio total. Quando o cancelamento chega, o sinal já estava lá, só que ninguém viu a tempo.
+Um condomínio raramente cancela do nada. Meses antes de ir embora, os moradores já foram parando de usar o aplicativo, menos acessos, menos engajamento, até o silêncio total. Quando o cancelamento chega, o sinal já estava lá, só que ninguém viu a tempo.
 
-Olhando os nossos dados, identificamos exatamente esse padrão: condomínios que cancelaram têm uma queda consistente no uso do app pelos moradores nos meses anteriores. Isso nos dá uma janela de oportunidade — se conseguirmos detectar essa queda cedo, o time de CS pode agir antes que a decisão de cancelar seja tomada.
+Olhando os nossos dados, identificamos exatamente esse padrão: condomínios que cancelaram têm uma queda consistente no uso do app pelos moradores nos meses anteriores. Isso nos dá uma janela de oportunidade, se conseguirmos detectar essa queda cedo, o time de CS pode agir antes que a decisão de cancelar seja tomada.
 
-A ideia é simples: criar um painel que mostre automaticamente quais condomínios estão com queda de uso acima de um threshold que definimos juntos — e colocar esses condomínios na fila prioritária do time. Não para "salvar" o cliente em cima da hora, mas para entender a dor dele enquanto ainda há tempo de resolver.
+A ideia é simples: criar um painel que mostre automaticamente quais condomínios estão com queda de uso acima de um threshold que definimos juntos, e colocar esses condomínios na fila prioritária do time. Não para "salvar" o cliente em cima da hora, mas para entender a dor dele enquanto ainda há tempo de resolver.
 
-Reter um cliente insatisfeito é muito mais fácil — e mais barato — do que reconquistar um que já foi embora. Essa análise transforma um problema reativo em uma rotina proativa.
+Reter um cliente insatisfeito é muito mais fácil, e mais barato, do que reconquistar um que já foi embora. Essa análise transforma um problema reativo em uma rotina proativa.
 
 ---
 
@@ -592,9 +592,9 @@ Reter um cliente insatisfeito é muito mais fácil — e mais barato — do que 
 #### Processo identificado: Health Score de Risco de Churn
 
 **O problema de negócio:**  
-Hoje, o CS só percebe que um condomínio vai cancelar quando já é tarde. A oportunidade é criar um **health score por condomínio** — um número simples que classifica o nível de risco com base em comportamento observado — e expô-lo em um painel para que o time aja de forma proativa, antes do cancelamento.
+Hoje, o CS só percebe que um condomínio vai cancelar quando já é tarde. A oportunidade é criar um **health score por condomínio**, um número simples que classifica o nível de risco com base em comportamento observado, e expô-lo em um painel para que o time aja de forma proativa, antes do cancelamento.
 
-A proposta deliberadamente evita um modelo de machine learning complexo. O perfil do time que vai sustentar isso é de Analytics Engineering — o que importa é uma regra auditável, explicável e ajustável via SQL, não uma caixa preta.
+A proposta deliberadamente evita um modelo de machine learning complexo. O perfil do time que vai sustentar isso é de Analytics Engineering, o que importa é uma regra auditável, explicável e ajustável via SQL, não uma caixa preta.
 
 ---
 
@@ -604,11 +604,11 @@ Antes de definir qualquer score, olhamos para trás. Pegamos os **50 condomínio
 
 As perguntas que a pesquisa responde:
 - Em quantos meses antes do churn a queda de acessos começa?
-- Qual a magnitude típica dessa queda — 20%? 40%? 60%?
+- Qual a magnitude típica dessa queda, 20%? 40%? 60%?
 - A queda é gradual ou abrupta?
 - Existe um padrão de meses consecutivos com queda antes do churn?
 
-Esse exercício transforma uma hipótese ("queda de acessos = risco") em uma **regra validada com dados reais**. Se os dados mostrarem que 80% dos churns tiveram queda acima de 30% por dois meses consecutivos, temos uma equação defensável para o score — e um argumento concreto para apresentar ao negócio.
+Esse exercício transforma uma hipótese ("queda de acessos = risco") em uma **regra validada com dados reais**. Se os dados mostrarem que 80% dos churns tiveram queda acima de 30% por dois meses consecutivos, temos uma equação defensável para o score, e um argumento concreto para apresentar ao negócio.
 
 **Dados necessários para a pesquisa:**
 
@@ -630,15 +630,15 @@ Com o padrão identificado na pesquisa histórica, definimos a regra do score. U
 | Queda de acessos entre 10% e 30% no último mês | 🟡 Risco médio |
 | Sem queda ou crescimento de acessos | 🟢 Saudável |
 
-Os thresholds (30%, 10%, 2 meses) não são arbitrários — são definidos **a partir do que os dados históricos revelam**. Se a pesquisa mostrar que o padrão real é diferente, os números mudam. A lógica permanece a mesma.
+Os thresholds (30%, 10%, 2 meses) não são arbitrários, são definidos **a partir do que os dados históricos revelam**. Se a pesquisa mostrar que o padrão real é diferente, os números mudam. A lógica permanece a mesma.
 
-Isso não é machine learning. É uma **regra de negócio validada com dados** — implementada como uma CTE no dbt, auditável por qualquer pessoa do time, ajustável sem retraining.
+Isso não é machine learning. É uma **regra de negócio validada com dados**, implementada como uma CTE no dbt, auditável por qualquer pessoa do time, ajustável sem retraining.
 
 ---
 
 #### Passo 3 — Aplicação nos condomínios ativos
 
-Com a regra definida, aplicamos nos **150 condomínios ativos** hoje. O output é um painel no Metabase com uma linha por condomínio, mostrando o score atual, a variação de acessos e o mês de vida da conta — ordenado do maior para o menor risco.
+Com a regra definida, aplicamos nos **150 condomínios ativos** hoje. O output é um painel no Metabase com uma linha por condomínio, mostrando o score atual, a variação de acessos e o mês de vida da conta, ordenado do maior para o menor risco.
 
 O CS abre esse painel toda semana e sabe exatamente em quem ligar primeiro.
 
@@ -657,25 +657,25 @@ O CS abre esse painel toda semana e sabe exatamente em quem ligar primeiro.
 
 #### Próximo passo concreto
 
-Rodar a pesquisa histórica com os 50 churns no PostgreSQL e verificar: existe de fato um padrão de queda de acessos consistente nos meses anteriores ao churn? Se sim, os thresholds do score estão calibrados. Se não, revisamos a hipótese antes de construir qualquer painel. O dado valida a ideia — não o contrário.
+Rodar a pesquisa histórica com os 50 churns no PostgreSQL e verificar: existe de fato um padrão de queda de acessos consistente nos meses anteriores ao churn? Se sim, os thresholds do score estão calibrados. Se não, revisamos a hipótese antes de construir qualquer painel. O dado valida a ideia, não o contrário.
 
 ---
 
 ## Observações Finais sobre Qualidade de Dados (Q1 revisitada com visão estratégica)
 
-A análise dos CSVs levantou um ponto que vai além da query: **qualidade de dados não é só validar valores individuais — é garantir consistência entre ambientes**. Se o PostgreSQL operacional tem 200 condomínios e o sistema de origem (app/Firebase) tem 200, ótimo. Se tiver 198 ou 202, precisamos de um processo de reconciliação automatizado que rode diariamente e alerte quando os números divergem.
+A análise dos CSVs levantou um ponto que vai além da query: **qualidade de dados não é só validar valores individuais, é garantir consistência entre ambientes**. Se o PostgreSQL operacional tem 200 condomínios e o sistema de origem (app/Firebase) tem 200, ótimo. Se tiver 198 ou 202, precisamos de um processo de reconciliação automatizado que rode diariamente e alerte quando os números divergem.
 
-Isso é um dos primeiros processos que eu implantaria: uma tabela `monitoramento_qualidade` que, todo dia, registra contagens por entidade (condomínios, moradores, ocorrências) cruzando a origem com o PostgreSQL — e um alerta no Metabase quando a diferença for maior que 0%.
+Isso é um dos primeiros processos que eu implantaria: uma tabela `monitoramento_qualidade` que, todo dia, registra contagens por entidade (condomínios, moradores, ocorrências) cruzando a origem com o PostgreSQL, e um alerta no Metabase quando a diferença for maior que 0%.
 
 ```sql
 -- Exemplo de tabela para monitoramento contínuo de qualidade entre ambientes
 CREATE TABLE monitoramento_qualidade (
-    data_verificacao    DATE        NOT NULL,
-    entidade            TEXT        NOT NULL,   -- 'condominios', 'moradores', etc.
-    qtd_origem          INTEGER,                -- contagem no sistema de origem
-    qtd_destino         INTEGER,                -- contagem no PostgreSQL
-    diferenca           INTEGER GENERATED ALWAYS AS (qtd_destino - qtd_origem) STORED,
-    flag_divergencia    BOOLEAN GENERATED ALWAYS AS (qtd_destino <> qtd_origem) STORED,
+    data_verificacao DATE NOT NULL
+    , entidade TEXT NOT NULL -- 'condominios', 'moradores', etc.
+    , qtd_origem INTEGER -- contagem no sistema de origem
+    , qtd_destino INTEGER -- contagem no PostgreSQL
+    , diferenca INTEGER GENERATED ALWAYS AS (qtd_destino - qtd_origem) STORED
+    , flag_divergencia BOOLEAN GENERATED ALWAYS AS (qtd_destino <> qtd_origem) STORED
     PRIMARY KEY (data_verificacao, entidade)
 );
 ```
